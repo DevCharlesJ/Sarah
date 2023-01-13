@@ -5,7 +5,7 @@ DATABASE = 'DATABASE.JSON'
 if __name__ == '__main__':
     import COMMUNICATION
 else:
-    from internal import COMMUNICATION
+    from . import COMMUNICATION
 
 import json
 
@@ -29,7 +29,6 @@ class DATA:
     @staticmethod
     def convert_topath(collection):
         return collection.split('.')
-        #return get_directories(dots_toindex())
 
     @staticmethod
     def get(request=None,all=False):
@@ -70,11 +69,10 @@ class DATA:
 
                 section = path_cpy[0]
 
-                try:
-                    _area = area[section]
-                except:
-                    COMMUNICATION.FORMAT.to_error(f'{section} not found', True)
+                if area.get(section, False) == False: # result could be None
+                    print(f'{section} not found')
                     return
+
                 if isinstance(area[section],dict):
                     area[section].update({dir_name: l_data or dict()})
                 else:
@@ -100,16 +98,14 @@ class DATA:
 
                 section = path_cpy[0]
 
-                try:
-                    _area = area[section]
-                except:
-                    COMMUNICATION.FORMAT.to_error(f'{section} not found',True)
+                if area.get(section, False) == False: # result could be None
+                    print(f'{section} not found')
                     return
 
-                if isinstance(_area,list):
-                    _area.append(new_data)
-                elif isinstance(_area,dict):
-                    _area.update(new_data)
+                if isinstance(area[section],list):
+                    area[section].append(new_data)
+                elif isinstance(area[section],dict):
+                    area[section].update(new_data)
                 else:
                     area[section] = [area[section],new_data]
                 with open(DATABASE, 'w') as w_database:
@@ -133,9 +129,8 @@ class DATA:
 
             section = path_cpy[-1]
 
-            try:
-                area[section]
-            except:
+
+            if area.get(section, False) == False: # result could be None
                 return f'{section} not found'
 
             if area[section] is None:
@@ -183,15 +178,15 @@ class DATA:
                     path_cpy.pop(0)
 
                 section = path_cpy[0]
-                try:
-                    _data = area[section]
-                except:
-                    COMMUNICATION.FORMAT.to_special(f"{section} not found",True)
+
+                if area.get(section, False) == False: # result could be None
+                    print(f'{section} not found')
                     return
+
                 area[section] = new_value
                 with open(DATABASE,'w') as w_database:
                     json.dump(data,w_database,indent=4)
 
-        if clear:
-            # To do
+        elif clear:
+            # TODO
             pass

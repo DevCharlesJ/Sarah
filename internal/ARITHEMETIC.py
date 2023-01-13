@@ -17,10 +17,31 @@ def PEMDAS(eq=[]):
     operators = []
     operands = []
 
-    # Challenge O(n) tike complexity
+    # Challenge O(n) time complexity
     ops = ('^', '*', '/', '+', '-')
 
 
+
+    info = list() # list of ops and their indexes
+    for i in range(len(eq)):
+        _ = eq[i]
+        if _ in ops:
+            info.append((_, i))
+
+    # sort operators according to pemdas
+    info.sort(
+        key=lambda I: ops.index(I[0])
+    )
+
+    # get left and right side (indexes) of each operation
+    operands = list(map(lambda I: [    I[1]-1   ,     I[1]+1    ], info))
+
+    operators = list(map(lambda _: _[0],info))
+
+
+
+    res = None
+    
     def calc(a, op,b):
         if op == '+':
             return a+b
@@ -36,34 +57,6 @@ def PEMDAS(eq=[]):
         
         if op == '/':
             return a/b
-
-
-    info = list() # list of ops and their indexes
-    for i in range(len(eq)):
-        _ = eq[i]
-        if _ in ops:
-            info.append((_, i))
-
-    length = len(info)
-    info.sort(
-        key=lambda I: ops.index(I[0]) if I[0] not in ['+','-'] else length
-    )
-
-    operands = list(map(
-        lambda _: [    _[1]-1   ,     _[1]+1    ], # get a and b from arr
-        info
-    ))
-
-    operators = list(map(lambda _: _[0],info))
-
-
-    ''' IDEA
-    create a placeholder list that repr the place for the awaiting result to go
-    '''
-
-
-    res = None
-    x = None
 
     results = list()
     used = list()
@@ -110,7 +103,26 @@ def solve(eq):
     res = PEMDAS(eq)
     return res
 
-def getEquations(context, math_keywords=list(), variables=dict(), ignore=list()):
+# TODO FIX Assignments
+'''   Issues: 
+        Words with a custom_variable in it bugs out
+'''
+
+special_characters = ['~', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '+', '-', '=', '[', ']', '{', '}', ';',
+                      ':','|', ',', '<', '.', '>', '/', '?','_'
+]
+
+def getEquations(context, math_keywords=None, variables=None, ignore=None):
+    if math_keywords is None:
+        math_keywords = list()
+
+    if variables is None:
+        variables = dict()
+
+    if ignore is None:
+        ignore = list()
+
+
     new = []
     eq = []
 
@@ -125,10 +137,15 @@ def getEquations(context, math_keywords=list(), variables=dict(), ignore=list())
         hasOp = sum([_ in ops for _ in eq]) != 0
         ofLength = len(eq) >= 3
         tailed = ofLength and (eq[0] in a_ops or eq[-1] in a_ops)    # has arithmetic op at beginning or end
+        assignCheck = sum([_ in assignment for _ in eq]) != 0
 
-        complete = hasOp and ofLength and not (not signed and tailed)
+        complete = hasOp and ofLength and not (not signed and tailed) and (str(eq[eq.index('=') - 1]).isalnum() if assignCheck else True)
         return complete
 
+
+    def convertCH(left,ch,right):
+        return left in ignore and (right not in ops and not isNum(right))
+    
     for i in range(len(context)):
         left = context[i-1] if i > 0 else None
         right = context[i+1] if i+1 < len(context) else None
@@ -144,8 +161,9 @@ def getEquations(context, math_keywords=list(), variables=dict(), ignore=list())
 
             # ch will = ch if conversion, shorthand notation, or arithmetics is not being performed on ch
             # else ch will be converted to its variable value, if possible
-            ch = ch if left in ignore and (right not in ops and not isNum(right))  else variables.get(ch,ch)
+            ch = ch if convertCH(left,ch,right) else variables.get(ch,ch)
             ch = str(ch)
+            context[i] = ch # Have to update character for next characters
 
         if signed and ch.isdigit():
             eq[-1] += ch
@@ -187,6 +205,8 @@ def getEquations(context, math_keywords=list(), variables=dict(), ignore=list())
             # Signed number solution
             if ch in ['+', '-']:
                 if not left or (left and not left.isdigit()): # no left and left is not a number
+                    nextRight = context[i+2] if i+2 < len(context) else None
+                    right = right if convertCH(ch, right, nextRight) else variables.get(right,right)
                     signed = True if right.isdigit() else False
                 
 

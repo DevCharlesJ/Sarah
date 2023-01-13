@@ -1,17 +1,16 @@
-#!/usr/bin/python3
-
-if __name__ != '__main__':
-    from internal import COMMUNICATION,UpdateData, DBManager, ARITHEMETIC
+if __name__ == '__main__':
+    import COMMUNICATION, UpdateData, ARITHEMETIC, DBManager
 else:
-    import COMMUNICATION,UpdateData, ARITHEMETIC, DBManager
+    from . import COMMUNICATION, UpdateData, ARITHEMETIC, DBManager
 
 import os,json
-from random import randint,choice
+from random import choice
 
 DATABASE,AIAUDIOFILE = 'DATABASE.json','Sarah.mp3'
 
 USER = None
-botaudio, custom_library = False,False
+botaudio = False
+custom_library = False
 
 extract = DBManager.extract
 
@@ -26,27 +25,29 @@ with open('internal/keywords.JSON','r') as f:
     math_keywords = KEYWORDS['math']
     convert_keywords = KEYWORDS['convert']
     data_keywords = KEYWORDS['data']
-# Passive keywords is unsupported till future versions
+# trailing (passive) keywords is not supported till future versions
 
 custom_variables = {}
 
 
 def group(collection):
-    result = None
-    for _ in [_ for i,_ in collection.items()]:
-        if result:
-            result = result + _
+    result = []
+    for v in collection.values():
+        if isinstance(v, list):
+            result += v
         else:
-            result = _
+            result.append(v)
+
 
     return result
-_math_keywords,_data_keywords = group(math_keywords),group(data_keywords)#,group(convert_keywords)
+
+_math_keywords, _data_keywords = group(math_keywords), group(data_keywords)#,group(convert_keywords)
                                        #^ _convert_keywords
                                        #v
-KEYWORDS = _math_keywords+_data_keywords
+KEYWORDS = _math_keywords + _data_keywords
 
 
-def ContextV4(string):
+def ToContextV4(string):
     array = list(string)
     toReturn = []
 
@@ -57,17 +58,17 @@ def ContextV4(string):
 
     userlib = DBManager.DATA.get(request=USER)
     global WORDS
-    WORDS = KEYWORDS+list(userlib.keys())+list(custom_variables.keys())
+    WORDS = KEYWORDS+list(userlib.keys())
 
     if custom_library:
+        # merge Data and Math Keywords
         WORDS = list(set(WORDS)^set(_math_keywords))
 
     for keyword in WORDS:    # KEEP THIS ORDER (KEYWORDS,userlib.keys(),custom_variables.keys())
         foundAt = string.find(keyword,curIndex)
 
         while foundAt != -1 and foundAt not in ignore:
-            # Duplicate case 1
-            if foundAt+1 < len(string) and (keyword == '*' and string[foundAt+1] == '*'):
+            if foundAt+1 < len(string) and (keyword == '*' and string[foundAt+1] == '*'): # polynomial occurence : case 1 (power **)
                 break
 
 
@@ -96,7 +97,7 @@ def ContextV4(string):
             text.lstrip(); text.rstrip() # removal left & right whitespace
             toReturn.append(text)
 
-    # Get equations fix                                                                                # process is not custom
+    # Get equations fix                                                                         # process is not custom
     toReturn = ARITHEMETIC.getEquations(toReturn, _math_keywords, custom_variables, _data_keywords) if not custom_library else toReturn
     return toReturn if toReturn != [] else None
 
@@ -119,17 +120,14 @@ def tryInt(num):
     else:
         return num
             
-def custom_processing(context, deletion=False):
+def custom_processing(context: list, deletion: bool=False) -> None:
     global botaudio
         
 
     UpdateData.all(USER)
 
-    '''Use of nicknames has been discontinued'''
-    #global nickname
-    #nickname = DBManager.DATA.get(f"{USER}.-custom-libray.nickname")
 
-    articles = ['a','an','the']   # list of definte articles
+    articles = ['a','an','the']   # list of definite articles
 
     if context[0].lower() in data_keywords['dir_return']+data_keywords['pas_return']:
         context.pop(0)
@@ -173,23 +171,29 @@ def custom_processing(context, deletion=False):
         if find:
             if deletion:
                 # Should later support mic answers?
-                answer = input(f'Delete {find}? [y/n]  -> ').lower()
+                answer = None
                 while answer not in ('y', 'yes', 'n', 'no'):
-                    answer = input(f'Invalid answer\nDelete {find}? [y/n] -> ')
+                    if answer != None:
+                        COMMUNICATION.FORMAT.normal("Invalid answer", out=botaudio)
+
+                    if botaudio:
+                        COMMUNICATION.FORMAT.normal(f"Are you sure you want to delete {find}?\n Enter yes or no in the prompt provided.", out=botaudio)
+
+                    answer = input(f'Delete {find}? [y/n]  -> ').lower()
 
                 if answer in ('y','yes'):
                     res = DBManager.DATA.remove_data(p=f'{USER}.-custom-library.{find}')
   
-                                        # if res is None, succesful removal
-                    COMMUNICATION.FORMAT.normal(res or f"{find}, has been removed from library",out=botaudio)
+                    # if res is None, succesful deletion
+                    COMMUNICATION.FORMAT.normal(res or f"{find}, has been deleted from this library",out=botaudio)
 
-                else:   # must be n, or no
-                    COMMUNICATION.FORMAT.normal(f"Removal cancelled",out=botaudio)
+                else:
+                    COMMUNICATION.FORMAT.normal(f"Deletion cancelled",out=botaudio)
             else:
                 find = find + ('?' if guess else '')
                 COMMUNICATION.FORMAT.normal(f"{find}",out=botaudio)
 
-def toBinaryOp(eq=[]):
+def toBinaryOp(eq: list=[]):
     for i in range(len(eq)):
         _ = eq[i]
         if _ in math_keywords['dir_add']:
@@ -207,7 +211,7 @@ def toBinaryOp(eq=[]):
 
     return eq
 
-def process(text,user, allowBotAudio=False,):
+def process(text: str,user: str, allowBotAudio: bool=False,) -> None:
     global botaudio,custom_library, USER
     botaudio = allowBotAudio
     USER = user
@@ -230,17 +234,17 @@ def process(text,user, allowBotAudio=False,):
         COMMUNICATION.FORMAT.normal(f'{choice(a)} {USER}!',botaudio)
         return
 
-    context = ContextV4(text) # List of characters split and grouped into keywords, words or numbers
-
-    #print(context) #FOR DEBUG
+    context = ToContextV4(text) # List of characters split and grouped into keywords, words or numbers
 
     if context is None:
-        COMMUNICATION.FORMAT.to_error(f"Sorry, I don't understand", botaudio)
+        COMMUNICATION.FORMAT.to_error("Sorry, I don't understand", out=botaudio)
         return
     
+    COMMUNICATION.FORMAT.normal("Processing", out=False)
 
-    for index,_ in enumerate(context):
-        lowered = _.lower() if type(_) is str else ''
+    # Loop through each sub-context and process it accordingly
+    for index ,_ in enumerate(context):
+        lowered = _.lower() if isinstance(_, str) else ''
 
         # Use Custom Library?
         if custom_library:
@@ -249,7 +253,7 @@ def process(text,user, allowBotAudio=False,):
                 COMMUNICATION.FORMAT.normal(f"Returning to default library", botaudio)
                 return None #Finished
             elif lowered in data_keywords['add_to_CL']:
-                # Label_Anser divide
+                # Label (Key) | Value
                 assign_syntax = -1
                 j_context = ' '.join(context)
                 try:
@@ -293,7 +297,7 @@ def process(text,user, allowBotAudio=False,):
 
 
         ##  IsMath?
-        elif type(_) is list:
+        elif isinstance(_, list):
             _ = toBinaryOp(_)
 
             assign_to = _[0] if '=' in _ and _[0] else None
@@ -334,7 +338,6 @@ def process(text,user, allowBotAudio=False,):
             else:
                 request = context[index+1]
 
-            # base case
             if type(request) is not str:
                 continue
             else:
@@ -397,3 +400,5 @@ def process(text,user, allowBotAudio=False,):
             custom_library = True
             COMMUNICATION.FORMAT.normal("I am now linked to your custom library",botaudio)
             return
+
+        # index += 1

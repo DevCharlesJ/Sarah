@@ -1,6 +1,5 @@
 #!/usr/bin/python3
-DATABASE = 'DATABASE.json'
-AIAUDIO = 'Sarah.mp3'
+AIAUDIOFILE = 'Sarah.mp3'
 
 import os,time,warnings
 
@@ -19,24 +18,21 @@ greeting_types=['Hello','How may I be of service','Hi']
 goodbye_types=['See you later', 'Goodbye for now', 'Adios', 'Farewell']
 
 
-if __name__ != '__main__':
-    from internal.MODULES.gtts import gTTS
-    from internal.MODULES.mutagen.mp3 import MP3
-else:
-    # Wont support google Text-To-Speech or Mutgan.Mp3 for scripts
-    gTTS = None
-    MP3 = None
+from gtts import gTTS
+from mutagen.mp3 import MP3
+# Need to integrate google Text-To-Speech or Mutgan.Mp3 for audible communication
 
 def thenaudio(t):
     # Defaulted to english Version 1.0.0
     try:
         tts = gTTS(text=t, lang='en')
-        tts.save(AIAUDIO)
-        os.system(AIAUDIO)
-        audio = MP3(AIAUDIO)
+        tts.save(AIAUDIOFILE)
+        os.system(AIAUDIOFILE)
+        audio = MP3(AIAUDIOFILE)
         time.sleep(audio.info.length)
-    except:
-        warnings.warn('GTTS or mutagen modules not enabled/installed')
+    except Exception as e:
+        print(f"Error MSG: {e}")
+        warnings.warn(f'GTTS or mutagen module error. Audible communication not available!\n')
         print('\nSpeech: ',t)
 
 
@@ -183,3 +179,7 @@ class FORMAT:
             else:
                 print(text)
 
+
+if __name__ == '__main__':
+    formatter = FORMAT()
+    formatter.normal("Hello!", out=True)
