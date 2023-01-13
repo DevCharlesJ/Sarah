@@ -1,95 +1,103 @@
 #!/usr/bin/python3
+
+
+
+# Sniff for required modules
+from _moduleHound import sniff
+sniff()
+
+
 DATABASE = 'DATABASE.JSON'
 try:
-    open(DATABASE).close()
-except:
+    with open(DATABASE, 'r') as r_db:
+        if r_db.read() == "":
+            with open(DATABASE, 'w') as w_db:
+                w_db.write('{}')
+
+except FileNotFoundError:
     with open(DATABASE,'w') as db:  # To initialize a database if none exists
         db.write('{}')
 
-from internal import DBManager as DBManager,Processor,COMMUNICATION,UpdateData
-import warnings
+
+from internal import COMMUNICATION, DBManager, Processor
+import speech_recognition as sr
+from os import system
 
 
-__on__,input_type,botaudio = True,'typed',False
+
+__on__ = True
+input_type, botaudio = 'typed', True
 
 def startup():
-    COMMUNICATION.FORMAT.normal('Login. Please enter your Username', out=botaudio)
-    user_name = input(f'[Login]\nPlease enter your Username -> ')
+    print("[LOGIN]")
+    COMMUNICATION.FORMAT.normal('Please enter your Username', out=botaudio)
+    user_name = input('<- ').strip()
     user = DBManager.DATA.get(user_name)
     if user: # TYPE: DICT
-        COMMUNICATION.FORMAT.normal('Please enter your password', out=botaudio)
-        pwd = input(f'Please enter your password -> ')
-
-        while pwd != user['password']:
-            COMMUNICATION.FORMAT.to_error('Error, Incorrect Password! Please try again', out=botaudio)
-            print('\nError, Incorrect Password! Please try again')
+        pwd = None # TYPE: STR
+        while pwd is None or pwd != user['password']:
+            if pwd: # pwd not None means user made an attempt
+                COMMUNICATION.FORMAT.to_error('Error, Incorrect Password! Please try again', out=botaudio)
 
             COMMUNICATION.FORMAT.normal('Please enter your password', out=botaudio)
-            pwd = input(f'Please enter your password -> ')
+            pwd = input('<- ')
+
         return user_name
 
 
     COMMUNICATION.FORMAT.normal(f'Hi {user_name}, it is nice to meet you! As a new user, I am required to have a password for your account.', out=botaudio)
-    print(f'Hello {user_name}!\nAs a new user, I am required to have a password for your account.\n')
     
-    # NO PASSWORD CHECKER (lazy)
-    COMMUNICATION.FORMAT.normal('Please type a safe password to be linked with your account', out=botaudio)
-    new_pwd = input(f'Please type a safe password to be linked with your account -> ')
+    # NO PASSWORD CHECKER or ENCRYPTION
+    new_pwd, confirm_pwd = None, None
 
-    COMMUNICATION.FORMAT.normal('Please re-enter your password for confirmation', out=botaudio)
-    confirm_pwd = input(f'Please re-enter your password for confirmation -> ')
-
-
-    while new_pwd != confirm_pwd:
-        COMMUNICATION.FORMAT.to_error('ERROR. Your entries did not match! Please try again', out=botaudio)
-        print('\nERROR! Your entries did not match! Please try again')
+    while new_pwd is None or new_pwd != confirm_pwd:
+        if new_pwd: # new_pwd not None means user made an attempt
+            COMMUNICATION.FORMAT.to_error('ERROR. Your entries did not match! Please try again', out=botaudio)
 
         COMMUNICATION.FORMAT.normal('Please type a safe password to be linked with your account', out=botaudio)
-        new_pwd = input(f'Please type a safe password to be linked with your account -> ')
+        new_pwd = input('<-')
 
         COMMUNICATION.FORMAT.normal('Please re-enter your password for confirmation', out=botaudio)
-        confirm_pwd = input(f'Please re-enter your password for confirmation -> ')
+        confirm_pwd = input('<- ')
 
     DBManager.DATA.create_directory(p=None,dir_name=user_name)
     DBManager.DATA.add_data(p=f'{user_name}', new_data={"password": new_pwd})
     DBManager.DATA.create_directory(p=f'{user_name}',dir_name='-custom-library')  # create custom library directory
 
-    for preset_data in 'morning,afternoon,night,evening,meridiem,time,date,today,day,month,year,thread,process,system flags'.split(','):
+    for preset_data in 'morning,afternoon,night,evening,meridiem,time,date,today,day,month,year'.split(','):
         DBManager.DATA.add_data(p=f'{user_name}', new_data={preset_data:''})
 
-    COMMUNICATION.FORMAT.normal('Thank you! Your account is now setup and ready', out=botaudio)
-    print('\nThank you! Your account is now setup and ready\n')
+    COMMUNICATION.FORMAT.normal('Thank you, you\'re all set and ready to go!', out=botaudio)
     return user_name
 
 
 USER = startup()  # USER is just user's user_name
 
-print()
+system("cls")
 greet = COMMUNICATION.random_selection(COMMUNICATION.greeting_types, super=True)
-COMMUNICATION.FORMAT.to_special(f'{greet}, {USER}!', botaudio)
+COMMUNICATION.FORMAT.to_special(f'{greet}, {USER}', botaudio)
 
-def srcheck():
-    try:
-        import speech_recognition as sr
-        return sr
-    except:
-        warnings.warn('Speech Recognition Module not enabled/installed')
-        return False
 
-value_error = False
+r = sr.Recognizer()
+Microphone = None
+try:
+    Microphone = sr.Microphone()
+except OSError:
+    pass
 
-sr = srcheck()
-r = sr.Recognizer() if sr else None
-Microphone = sr.Microphone() if sr else None
 check = r and Microphone
 
 while __on__:
     print()   # So each run output is seperated
     #For typing
     if input_type == 'typed':
-        run = Processor.process(input('-> '), USER, botaudio)
+        entry = input('-> ')
+
+        system("cls")
+        print(f"-> {entry}")
+        run = Processor.process(entry,USER, botaudio)
         if run == 'shutdown':
-            break
+            __on__ = False
         elif run == 'switch input':
             if check:
                 input_type = 'audible'
@@ -103,14 +111,15 @@ while __on__:
         try:
             print("I'm Listening ~(=...")
             with Microphone as source:
-                r.adjust_for_ambient_noise(source,duration=0.5)
+                r.adjust_for_ambient_noise(source,duration=1)
                 audio = r.listen(source)
-
                 text = r.recognize_google(audio)
-                COMMUNICATION.FORMAT.normal(f'{text}?', out=botaudio)
+
+                system("cls")
+                COMMUNICATION.FORMAT.normal(f'{text}?', out=False)
                 run = Processor.process(text,USER, botaudio)
                 if run == 'shutdown':
-                    break
+                    __on__ = False
                 elif run == 'switch input':
                     input_type = 'typed'
                     COMMUNICATION.FORMAT.normal(f"Input switched to typed", out=botaudio)
@@ -118,11 +127,8 @@ while __on__:
                     botaudio = not botaudio
                     COMMUNICATION.FORMAT.normal(f'Bot audio switch to {botaudio}', out=False)
 
-                value_error = False
         except sr.UnknownValueError as e:
-            if not value_error:
-                COMMUNICATION.FORMAT.normal(f'Sorry, I don\'t understand', out=botaudio)
-                value_error = True
+            COMMUNICATION.FORMAT.normal(f"Sorry, I don't understand", out=botaudio)
         except sr.RequestError as e:
             pass
 
