@@ -10,4 +10,4 @@ Latest Release : Stable Pre-Release
 
 
 
-Documentation soon
+Documentation soon, refer to internal/keywords.json for keyword hints
