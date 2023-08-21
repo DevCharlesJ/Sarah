@@ -1,4 +1,4 @@
-# Python-Command-Bot V1
+# Sarah
 
 
 
@@ -10,4 +10,4 @@ Latest Release : Stable Pre-Release
 
 
 
-Documentation soon, refer to internal/keywords.json for keyword hints
+Refer to internal/keywords.json for keyword hints
